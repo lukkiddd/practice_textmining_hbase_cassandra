@@ -1,6 +1,8 @@
 
-# Text Mining #
+# ลองทำ Text Mining ด้วย Twitter Streaming API และ Python #
+เราจะทำ text mining ด้วย twitter streaming api และ python เพื่อทำการดึงข้อมูลจากทวิตเตอร์มานับจำนวนทวีตเพื่อดูว่าระหว่าง Hbase กับ Cassandra คนพูดถึงคำไหนมากกว่ากันใน twitter 
 
+เริ่มต้นด้วยการ import library ที่จะเป็นเข้ามาในไฟล์ครับ
 
 
 ```python
@@ -10,6 +12,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 ```
+
+ทำการอ่านไฟล์ข้อมูลที่เราทำการเก็บมาครับ
 
 
 ```python
@@ -27,6 +31,8 @@ for line in tweets_file:
 		continue
 ```
 
+ลองดูว่าเราอ่านมาได้ทั้งหมดเท่าไหร่
+
 
 ```python
 print len(tweets_data)
@@ -34,6 +40,9 @@ print len(tweets_data)
 
     4807
 
+
+### สร้าง DataFrame ด้วย pandas ###
+ทำการสร้าง DataFrame ชื่อ tweets สำหรับจัดการกับข้อมูลที่ได้มาครับ
 
 
 ```python
@@ -46,6 +55,8 @@ tweets['lang'] = map(lambda tweet: tweet['lang'], tweets_data)
 tweets['country'] = map(lambda tweet: tweet['place']['country'] if tweet['place'] != None else None, tweets_data)
 
 ```
+
+ดูว่ามีภาษาอะไรบ้างที่เราได้ข้อมูลมา
 
 
 ```python
@@ -63,8 +74,10 @@ plt.show()
 ```
 
 
-![png](output_5_0.png)
+![png](output_10_0.png)
 
+
+ลองดูข้อมูลตามประเทศ 5 อันดับแรก
 
 
 ```python
@@ -82,8 +95,10 @@ plt.show()
 ```
 
 
-![png](output_6_0.png)
+![png](output_12_0.png)
 
+
+### สร้างฟังค์ชันสำหรับค้นหาคำที่อยู่ในข้อความ ###
 
 
 ```python
@@ -97,12 +112,16 @@ def word_in_text(word, text):
 	return False
 ```
 
+จัดกลุ่มข้อความระหว่าง Hbase กับ Cassandra
+
 
 ```python
 # Add 2 columns in DataFrame
 tweets['hbase'] = tweets['text'].apply(lambda tweet: word_in_text('hbase', tweet))
 tweets['cassandra'] = tweets['text'].apply(lambda tweet: word_in_text('cassandra', tweet))
 ```
+
+ดูจำนวนกันหน่อยว่าพูดถึงกันเยอะไหม
 
 
 ```python
@@ -113,6 +132,8 @@ print tweets['cassandra'].value_counts()[True]
     50
     4603
 
+
+ลองเอามาพลอตกราฟ เพื่อให้เห็นได้ง่ายขึ้น
 
 
 ```python
@@ -136,14 +157,21 @@ plt.show()
 ```
 
 
-![png](output_11_0.png)
+![png](output_21_0.png)
 
+
+ต่างกันเยอะเหมือนกันนะเนี่ย แต่ว่าข้อมูลนี้ยังเป็นข้อมูลดิบครับ Cassandra อาจจะเป็นชื่อดารา หรือ อะไรก็ได้ ดังนั้นเราต้องกรองก่อน
+
+### กรองข้อมูล เอาเฉพาะที่เกี่ยวข้อง ###
+เราจะกรองโดยใช้คำว่า "bigdata", "database", "parallel", "nosql"
 
 
 ```python
 # Targeting relevant tweets
 tweets['relevant'] = tweets['text'].apply(lambda tweet: word_in_text('bigdata', tweet) or word_in_text('database', tweet) or word_in_text('parallel',tweet) or word_in_text('nosql', tweet))
 ```
+
+พอกรองมาแล้ว จำนวนลดลงอย่างมหาศาลเลย แต่นี่คือการกรองแบบคร่าวมาก ๆ ครับ
 
 
 ```python
@@ -154,6 +182,8 @@ print tweets[tweets['relevant'] == True]['cassandra'].value_counts()[True]
     21
     132
 
+
+มาพลอตกราฟดูกันดีกว่า
 
 
 ```python
@@ -176,8 +206,13 @@ plt.show()
 ```
 
 
-![png](output_15_0.png)
+![png](output_29_0.png)
 
+
+ก็ยังเยอะกว่ามากอยู่ดีครับจากกราฟ อาจจะมีเหตุผลจากหลายประการ เพราะกรองคำคร่าว ๆ หรือไม่ก็ Hbase อาจจะไม่ได้ถูกพูดถึงในช่วงเวลาที่เก็บข้อมูลครับ (22 กันยา 2558 - 23 กันยา 2558)
+
+### ต่อไปมาทำการแตกข้อความหาลิงค์กันดีกว่า ###
+เริ่มจากสร้างฟังค์ชั่นเพื่อหาลิงค์ครับ ตัดข้อความด้วย regular expression
 
 
 ```python
@@ -200,6 +235,8 @@ tweets['link'] = tweets['text'].apply(lambda tweet: extract_link(tweet))
 tweets_relevant = tweets[tweets['relevant'] == True]
 tweets_relevant_with_link = tweets_relevant[tweets_relevant['link'] != '']
 ```
+
+พอคัดลิงค์ได้แล้ว เอามาโชว์ซักหน่อยบางส่วน เผื่อจะตามไปดูกัน
 
 
 ```python
@@ -293,7 +330,9 @@ print tweets_relevant_with_link[tweets_relevant_with_link['cassandra'] == True][
     Name: link, dtype: object
 
 
+### จบแล้ว  ##
+ใครที่สนใจอ่านแบบเต็มได้ที่: http://lukkid.in.th/text-mining-with-twitter-api-and-python/
 
-```python
+แหล่งอ้างอิง: http://adilmoujahid.com/posts/2014/07/twitter-analytics/
 
-```
+มีข้อเสนอแนะติชมได้เลยนะครับ ขอบคุณครับ
